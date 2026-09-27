@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Toka.Application.Abstractions;
 using Toka.Application.Payments;
 using Toka.Domain.Customers;
@@ -65,4 +66,12 @@ internal static class TestData
         Toka.Domain.Products.Product.Create(Guid.NewGuid(), "SKU-1", "Audífonos", "", price, "MXN", stock);
 
     public static CardDetails Card(string number = "4111111111111111") => new("ANA LOPEZ", number, 12, 2030, "123");
+}
+
+internal static class Installments
+{
+    public static readonly InstallmentPolicy Policy = new(Options.Create(new InstallmentOptions
+    {
+        Plans = [new() { Months = 3, MinimumAmount = 1500m }, new() { Months = 6, MinimumAmount = 3000m }],
+    }));
 }

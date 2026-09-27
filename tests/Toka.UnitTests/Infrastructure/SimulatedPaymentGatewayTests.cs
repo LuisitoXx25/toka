@@ -14,7 +14,7 @@ public class SimulatedPaymentGatewayTests
     private readonly SimulatedPaymentGateway _gateway = new(NoLatency, TimeProvider.System);
 
     private static PaymentRequest Request(string card, int attempt = 1, decimal amount = 100m) =>
-        new(Guid.NewGuid(), attempt, amount, "MXN", TestData.Card(card));
+        new(Guid.NewGuid(), attempt, amount, "MXN", 1, TestData.Card(card));
 
     [Theory]
     [InlineData("4111111111111111", 1, PaymentOutcome.Approved)]

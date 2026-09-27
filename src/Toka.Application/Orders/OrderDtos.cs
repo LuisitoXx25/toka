@@ -5,9 +5,14 @@ using Toka.Domain.Orders;
 
 namespace Toka.Application.Orders;
 
-public sealed record PlaceOrderCommand(CustomerInput Customer, Guid ProductId, int Quantity, CardDetails Card, string? IdempotencyKey);
+/// <param name="Installments">MSI months; 1 is a single payment.</param>
+public sealed record PlaceOrderCommand(CustomerInput Customer, Guid ProductId, int Quantity, int Installments, CardDetails Card, string? IdempotencyKey);
 
-public sealed record RetryPaymentCommand(Guid OrderId, CardDetails Card);
+/// <param name="CustomerEmail">Must match the order's customer; proves the caller owns the order.</param>
+public sealed record RetryPaymentCommand(Guid OrderId, string CustomerEmail, CardDetails Card);
+
+/// <param name="CustomerEmail">Must match the order's customer.</param>
+public sealed record LookupOrderQuery(Guid OrderId, string CustomerEmail);
 
 public sealed record PaymentAttemptDto(int AttemptNumber, string Outcome, string ResponseCode, string? Message,
     string CardBrand, string CardLast4, DateTimeOffset OccurredAt);
@@ -25,6 +30,8 @@ public sealed record OrderDto(
     decimal TaxAmount,
     decimal Total,
     string Currency,
+    int Installments,
+    decimal MonthlyPayment,
     string Status,
     string StatusDisplay,
     string? AuthorizationCode,
@@ -36,7 +43,7 @@ public sealed record OrderDto(
     IReadOnlyList<AuditEntry> Events)
 {
     public static OrderDto From(Order o, IReadOnlyList<AuditEntry> events) => new(
-        o.Id, o.CustomerId, o.ProductId, o.Quantity, o.UnitPrice, o.Subtotal, o.TaxRate, o.TaxAmount, o.Total, o.Currency,
+        o.Id, o.CustomerId, o.ProductId, o.Quantity, o.UnitPrice, o.Subtotal, o.TaxRate, o.TaxAmount, o.Total, o.Currency, o.Installments, o.MonthlyPayment,
         o.Status.ToString(), o.Status.ToDisplayName(),
         o.AuthorizationCode, o.FailureReason, o.CanRetryPayment, o.CreatedAt, o.UpdatedAt,
         o.Attempts

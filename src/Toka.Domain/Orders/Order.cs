@@ -18,6 +18,8 @@ public sealed class Order : Entity
     /// <summary>Amount charged to the card, IVA included.</summary>
     public decimal Total { get; private set; }
     public string Currency { get; private set; } = null!;
+    /// <summary>Interest-free monthly installments (MSI); 1 means a single payment.</summary>
+    public int Installments { get; private set; } = 1;
     public OrderStatus Status { get; private set; }
     public string? IdempotencyKey { get; private set; }
     public string? AuthorizationCode { get; private set; }
@@ -36,8 +38,10 @@ public sealed class Order : Entity
     /// Product prices include IVA; the breakdown is stored so the order keeps the rate in force when it was placed.
     /// Amounts never change after creation.
     /// </summary>
-    public static Order Place(Guid customerId, Product product, int quantity, string? idempotencyKey, DateTimeOffset now)
+    public static Order Place(Guid customerId, Product product, int quantity, int installments, string? idempotencyKey, DateTimeOffset now)
     {
+        if (installments < 1)
+            throw new DomainException("validation", "El número de meses debe ser al menos 1.");
         product.Reserve(quantity);
         var tax = TaxBreakdown.FromTaxIncludedTotal(product.Price * quantity);
         return new Order
@@ -50,6 +54,7 @@ public sealed class Order : Entity
             TaxRate = tax.TaxRate,
             TaxAmount = tax.TaxAmount,
             Total = tax.Total,
+            Installments = installments,
             Currency = product.Currency,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,
@@ -59,6 +64,9 @@ public sealed class Order : Entity
     }
 
     public int NextAttemptNumber => _attempts.Count + 1;
+
+    /// <summary>Amount of each monthly payment. MSI carries no interest, so it is simply the total split evenly.</summary>
+    public decimal MonthlyPayment => Math.Round(Total / Installments, 2, MidpointRounding.AwayFromZero);
 
     public PaymentAttempt RecordAttempt(PaymentOutcome outcome, string responseCode, string? message,
         string? authorizationCode, string cardLast4, string cardBrand, DateTimeOffset now)

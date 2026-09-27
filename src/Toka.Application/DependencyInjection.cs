@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<ProductService>();
         services.AddScoped<OrderService>();
         services.AddScoped<PaymentProcessor>();
+        services.AddSingleton<InstallmentPolicy>();
         return services;
     }
 }

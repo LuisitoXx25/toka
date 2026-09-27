@@ -17,10 +17,13 @@ public sealed record CardRequest(string HolderName, string Number, int ExpiryMon
     public override string ToString() => "CardRequest { *** }";
 }
 
-public sealed record PlaceOrderRequest(CustomerRequest Customer, Guid ProductId, int Quantity, CardRequest Card)
+/// <summary>Checkout request. <c>Installments</c> are MSI months; omit it or send 1 for a single payment.</summary>
+public sealed record PlaceOrderRequest(CustomerRequest Customer, Guid ProductId, int Quantity, CardRequest Card, int Installments = 1)
 {
     public PlaceOrderCommand ToCommand(string? idempotencyKey) =>
-        new(Customer?.ToInput()!, ProductId, Quantity, Card?.ToDetails()!, idempotencyKey);
+        new(Customer?.ToInput()!, ProductId, Quantity, Installments, Card?.ToDetails()!, idempotencyKey);
 }
 
-public sealed record RetryPaymentRequest(CardRequest Card);
+public sealed record RetryPaymentRequest(string Email, CardRequest Card);
+
+public sealed record LookupOrderRequest(Guid OrderId, string Email);

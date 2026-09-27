@@ -20,7 +20,7 @@ public class ValidatorTests
 
     private static PlaceOrderCommand Valid() => new(
         new CustomerInput("Ana", "López", "ana@correo.mx", "+52 55 1234 5678"),
-        Guid.NewGuid(), 1, TestData.Card(), "key-1");
+        Guid.NewGuid(), 1, 1, TestData.Card(), "key-1");
 
     [Fact]
     public void Valid_command_passes() => Assert.True(_validator.Validate(Valid()).IsValid);

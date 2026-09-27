@@ -5,6 +5,7 @@ using Toka.Application.Common;
 using Toka.Application.Customers;
 using Toka.Application.Payments;
 using Toka.Domain.Common;
+using Toka.Domain.Customers;
 using Toka.Domain.Orders;
 using Toka.Domain.Products;
 
@@ -12,13 +13,16 @@ namespace Toka.Application.Orders;
 
 public sealed class OrderService(
     IOrderRepository orders,
+    ICustomerRepository customers,
     IProductRepository products,
     CustomerService customerService,
     PaymentProcessor paymentProcessor,
+    InstallmentPolicy installments,
     IUnitOfWork unitOfWork,
     IAuditLog audit,
     IValidator<PlaceOrderCommand> placeValidator,
     IValidator<RetryPaymentCommand> retryValidator,
+    IValidator<LookupOrderQuery> lookupValidator,
     TimeProvider clock,
     ILogger<OrderService> logger)
 {
@@ -40,16 +44,19 @@ public sealed class OrderService(
         if (await products.GetByIdAsync(command.ProductId, ct) is not { } product)
             return Error.NotFound("el producto", command.ProductId);
 
+        if (installments.Reject(command.Installments, product.Price * command.Quantity) is { } reason)
+            return new Error("installments_not_available", reason, ErrorType.BusinessRule);
+
         // Customer, order and stock reservation are committed together, before talking to the payment gateway.
         Order order;
         try
         {
             var customer = await customerService.FindOrAddAsync(command.Customer, ct);
-            order = Order.Place(customer.Id, product, command.Quantity, command.IdempotencyKey, clock.GetUtcNow());
+            order = Order.Place(customer.Id, product, command.Quantity, command.Installments, command.IdempotencyKey, clock.GetUtcNow());
             orders.Add(order);
             audit.Record(AuditEvents.OrderCreated,
-                $"Orden creada: {order.Quantity} × {product.Name}. Subtotal {order.Subtotal:N2} + IVA {order.TaxAmount:N2} = {order.Total:N2} {order.Currency}.",
-                nameof(Order), order.Id, new { order.CustomerId, order.ProductId, order.Quantity, order.UnitPrice, order.Subtotal, order.TaxRate, order.TaxAmount, order.Total, order.Currency });
+                $"Orden creada: {order.Quantity} × {product.Name}. Subtotal {order.Subtotal:N2} + IVA {order.TaxAmount:N2} = {order.Total:N2} {order.Currency}{DescribeInstallments(order)}.",
+                nameof(Order), order.Id, new { order.CustomerId, order.ProductId, order.Quantity, order.UnitPrice, order.Subtotal, order.TaxRate, order.TaxAmount, order.Total, order.Currency, order.Installments });
             RecordStockReserved(order, product);
             await unitOfWork.SaveChangesAsync(ct);
         }
@@ -71,7 +78,7 @@ public sealed class OrderService(
     {
         if (await retryValidator.ValidateToErrorAsync(command, ct) is { } validationError) return validationError;
 
-        if (await orders.GetByIdAsync(command.OrderId, ct) is not { } order)
+        if (await FindOwnedOrderAsync(command.OrderId, command.CustomerEmail, ct) is not { } order)
             return Error.NotFound("la orden", command.OrderId);
         var product = await products.GetByIdAsync(order.ProductId, ct)
             ?? throw new InvalidOperationException($"Product {order.ProductId} of order {order.Id} is missing.");
@@ -96,9 +103,34 @@ public sealed class OrderService(
         return await ToDtoAsync(order, ct);
     }
 
-    /// <summary>Order status with its payment attempts and audit trail.</summary>
+    /// <summary>Order status for trusted API clients (back office). Not exposed to the public web.</summary>
     public async Task<Result<OrderDto>> GetAsync(Guid id, CancellationToken ct) =>
         await orders.GetByIdAsync(id, ct) is { } order ? await ToDtoAsync(order, ct) : Error.NotFound("la orden", id);
+
+    /// <summary>
+    /// Guest order lookup: requires the order id and the buyer's email. A wrong email returns the same
+    /// not-found error as an unknown id, so the response never confirms that an order exists.
+    /// </summary>
+    public async Task<Result<OrderDto>> LookupAsync(LookupOrderQuery query, CancellationToken ct)
+    {
+        if (await lookupValidator.ValidateToErrorAsync(query, ct) is { } validationError) return validationError;
+
+        return await FindOwnedOrderAsync(query.OrderId, query.CustomerEmail, ct) is { } order
+            ? await ToDtoAsync(order, ct)
+            : Error.NotFound("la orden", query.OrderId);
+    }
+
+    private async Task<Order?> FindOwnedOrderAsync(Guid orderId, string email, CancellationToken ct)
+    {
+        if (await orders.GetByIdAsync(orderId, ct) is not { } order) return null;
+
+        var customer = await customers.GetByIdAsync(order.CustomerId, ct);
+        if (customer?.Email == Customer.NormalizeEmail(email)) return order;
+
+        // Repeated mismatches for the same order may indicate enumeration; the email itself is not logged.
+        logger.LogWarning("Order {OrderId} requested with an email that does not match its customer", orderId);
+        return null;
+    }
 
     private void RecordStockReserved(Order order, Product product) =>
         audit.Record(AuditEvents.StockReserved,
@@ -107,6 +139,9 @@ public sealed class OrderService(
 
     private async Task<OrderDto> ToDtoAsync(Order order, CancellationToken ct) =>
         OrderDto.From(order, await audit.GetForEntityAsync(order.Id, ct));
+
+    private static string DescribeInstallments(Order order) =>
+        order.Installments > 1 ? $", en {InstallmentPolicy.Describe(order.Installments, order.MonthlyPayment)}" : "";
 
     private static Error ConcurrencyError() =>
         new("concurrency_conflict", "El inventario cambió mientras se procesaba la orden. Intenta de nuevo.", ErrorType.Conflict);

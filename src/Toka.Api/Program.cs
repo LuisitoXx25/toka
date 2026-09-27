@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -11,6 +12,9 @@ using Toka.Application;
 using Toka.Application.Abstractions;
 using Toka.Infrastructure;
 using Toka.Infrastructure.Persistence;
+
+// Amounts in user-facing messages and audit descriptions are formatted for Mexico regardless of the host's locale.
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("es-MX");
 
 var builder = WebApplication.CreateBuilder(args);
 

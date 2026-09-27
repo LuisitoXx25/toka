@@ -45,7 +45,8 @@ public class CheckoutApiTests(ApiFactory factory)
     {
         var stockBefore = await _client.StockAsync(Checkout.Headphones);
 
-        var declined = await _client.PlaceAsync(Checkout.Order(Checkout.DeclinedCard));
+        var email = $"ana.{Guid.NewGuid():N}@correo.mx";
+        var declined = await _client.PlaceAsync(Checkout.Order(Checkout.DeclinedCard, email: email));
 
         Assert.Equal(HttpStatusCode.Created, declined.StatusCode);
         var order = await declined.JsonAsync();
@@ -55,7 +56,7 @@ public class CheckoutApiTests(ApiFactory factory)
         Assert.Equal(stockBefore, await _client.StockAsync(Checkout.Headphones));
 
         var retry = await _client.PostAsJsonAsync($"/api/v1/orders/{order["id"]}/payment-retries",
-            new { card = Checkout.Card("5555555555554444") });
+            new { email, card = Checkout.Card("5555555555554444") });
 
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
         var paid = await retry.JsonAsync();
@@ -67,10 +68,11 @@ public class CheckoutApiTests(ApiFactory factory)
     [Fact]
     public async Task Paid_order_cannot_be_retried()
     {
-        var order = await (await _client.PlaceAsync(Checkout.Order())).JsonAsync();
+        var email = $"ana.{Guid.NewGuid():N}@correo.mx";
+        var order = await (await _client.PlaceAsync(Checkout.Order(email: email))).JsonAsync();
 
         var retry = await _client.PostAsJsonAsync($"/api/v1/orders/{order["id"]}/payment-retries",
-            new { card = Checkout.Card(Checkout.ApprovedCard) });
+            new { email, card = Checkout.Card(Checkout.ApprovedCard) });
 
         Assert.Equal(HttpStatusCode.Conflict, retry.StatusCode);
         Assert.Equal("invalid_order_state", (string?)(await retry.JsonAsync())["code"]);
@@ -116,6 +118,36 @@ public class CheckoutApiTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Installment_plans_depend_on_the_amount()
+    {
+        var plans = await (await _client.GetAsync("/api/v1/installment-plans?amount=1899")).JsonAsync();
+
+        Assert.Equal([1, 3], plans.AsArray().Select(p => (int)p!["months"]!));
+        Assert.Equal("3 pagos de $633.00 sin intereses", (string?)plans[1]!["label"]);
+        Assert.Equal(633m, (decimal)plans[1]!["monthlyPayment"]!);
+    }
+
+    [Fact]
+    public async Task Order_can_be_paid_in_interest_free_installments()
+    {
+        var order = await (await _client.PlaceAsync(Checkout.Order(installments: 6))).JsonAsync();
+
+        Assert.Equal("Paid", (string?)order["status"]);
+        Assert.Equal(6, (int)order["installments"]!);
+        Assert.Equal(583.17m, (decimal)order["monthlyPayment"]!);
+        Assert.Contains("en 6 pagos de $583.17 sin intereses", (string?)order["events"]![0]!["description"]);
+    }
+
+    [Fact]
+    public async Task Installment_plan_below_minimum_is_rejected()
+    {
+        var response = await _client.PlaceAsync(Checkout.Order(productId: Checkout.Keyboard, installments: 6));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("installments_not_available", (string?)(await response.JsonAsync())["code"]);
+    }
+
+    [Fact]
     public async Task Invalid_request_returns_field_errors_in_spanish()
     {
         var response = await _client.PostAsJsonAsync("/api/v1/orders", new
@@ -157,6 +189,31 @@ public class CheckoutApiTests(ApiFactory factory)
         var problem = await response.JsonAsync();
         Assert.Equal("insufficient_stock", (string?)problem["code"]);
         Assert.StartsWith("Solo hay", (string?)problem["detail"]);
+    }
+
+    [Fact]
+    public async Task Guest_lookup_needs_order_id_and_matching_email()
+    {
+        var email = $"ana.{Guid.NewGuid():N}@correo.mx";
+        var order = await (await _client.PlaceAsync(Checkout.Order(email: email))).JsonAsync();
+
+        var owner = await _client.PostAsJsonAsync("/api/v1/orders/lookup", new { orderId = order["id"], email = email.ToUpperInvariant() });
+        var stranger = await _client.PostAsJsonAsync("/api/v1/orders/lookup", new { orderId = order["id"], email = "otra@correo.mx" });
+
+        Assert.Equal(HttpStatusCode.OK, owner.StatusCode);
+        Assert.Equal((string?)order["id"], (string?)(await owner.JsonAsync())["id"]);
+        Assert.Equal(HttpStatusCode.NotFound, stranger.StatusCode);
+    }
+
+    [Fact]
+    public async Task Retry_payment_requires_the_buyer_email()
+    {
+        var order = await (await _client.PlaceAsync(Checkout.Order(Checkout.DeclinedCard))).JsonAsync();
+
+        var retry = await _client.PostAsJsonAsync($"/api/v1/orders/{order["id"]}/payment-retries",
+            new { email = "otra@correo.mx", card = Checkout.Card(Checkout.ApprovedCard) });
+
+        Assert.Equal(HttpStatusCode.NotFound, retry.StatusCode);
     }
 
     [Fact]

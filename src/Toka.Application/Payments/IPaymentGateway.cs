@@ -9,7 +9,8 @@ public interface IPaymentGateway
     Task<PaymentResponse> AuthorizeAsync(PaymentRequest request, CancellationToken ct);
 }
 
-public sealed record PaymentRequest(Guid OrderId, int AttemptNumber, decimal Amount, string Currency, CardDetails Card);
+/// <param name="Installments">MSI months requested from the issuer; 1 is a single payment.</param>
+public sealed record PaymentRequest(Guid OrderId, int AttemptNumber, decimal Amount, string Currency, int Installments, CardDetails Card);
 
 public sealed record PaymentResponse(PaymentOutcome Outcome, string ResponseCode, string? Message, string? AuthorizationCode);
 

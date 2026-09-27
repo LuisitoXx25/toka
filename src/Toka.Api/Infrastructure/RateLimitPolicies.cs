@@ -6,6 +6,7 @@ namespace Toka.Api.Infrastructure;
 public static class RateLimitPolicies
 {
     public const string Checkout = "checkout";
+    public const string Lookup = "lookup";
 
     /// <summary>
     /// Global limit per client IP plus a tighter one for endpoints that hit the payment gateway,
@@ -15,6 +16,7 @@ public static class RateLimitPolicies
     {
         var globalPerMinute = configuration.GetValue("RateLimiting:GlobalPerMinute", 120);
         var checkoutPerMinute = configuration.GetValue("RateLimiting:CheckoutPerMinute", 10);
+        var lookupPerMinute = configuration.GetValue("RateLimiting:LookupPerMinute", 20);
 
         return services.AddRateLimiter(options =>
         {
@@ -23,6 +25,10 @@ public static class RateLimitPolicies
 
             options.AddPolicy(Checkout, ctx =>
                 RateLimitPartition.GetFixedWindowLimiter(ClientKey(ctx), _ => Window(checkoutPerMinute)));
+
+            // Slows down guessing of order id + email pairs.
+            options.AddPolicy(Lookup, ctx =>
+                RateLimitPartition.GetFixedWindowLimiter(ClientKey(ctx), _ => Window(lookupPerMinute)));
 
             options.OnRejected = async (context, ct) =>
             {

@@ -18,12 +18,13 @@ internal static class Checkout
 
     public static object Card(string number) => new { holderName = "ANA LOPEZ", number, expiryMonth = 12, expiryYear = 2030, cvv = "123" };
 
-    public static object Order(string card = ApprovedCard, Guid? productId = null, int quantity = 1, string? email = null) => new
+    public static object Order(string card = ApprovedCard, Guid? productId = null, int quantity = 1, string? email = null, int installments = 1) => new
     {
         customer = new { firstName = "Ana", lastName = "López", email = email ?? $"ana.{Guid.NewGuid():N}@correo.mx", phone = "+52 55 1234 5678" },
         productId = productId ?? Headphones,
         quantity,
         card = Card(card),
+        installments,
     };
 
     public static Task<HttpResponseMessage> PlaceAsync(this HttpClient client, object order, string? idempotencyKey = null)

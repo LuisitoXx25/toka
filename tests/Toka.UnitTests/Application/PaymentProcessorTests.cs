@@ -15,7 +15,7 @@ public class PaymentProcessorTests
     private readonly Product _product = TestData.Product(stock: 5);
     private readonly Order _order;
 
-    public PaymentProcessorTests() => _order = Order.Place(Guid.NewGuid(), _product, 2, null, TestData.Now);
+    public PaymentProcessorTests() => _order = Order.Place(Guid.NewGuid(), _product, 2, 1, null, TestData.Now);
 
     private PaymentProcessor Processor(IPaymentGateway gateway) => new(
         gateway, _store, _store, new FakeTimeProvider(TestData.Now),

@@ -37,7 +37,22 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
         return replayed ? Ok(order) : CreatedAtAction(nameof(Get), new { id = order.Id }, order);
     }
 
-    /// <summary>Order status, IVA breakdown, payment attempts and audit trail.</summary>
+    /// <summary>
+    /// Guest lookup by order id and buyer email. A wrong email returns 404, same as an unknown order.
+    /// POST keeps the email out of URLs and access logs.
+    /// </summary>
+    [HttpPost("lookup")]
+    [EnableRateLimiting(RateLimitPolicies.Lookup)]
+    [ProducesResponseType<OrderDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OrderDto>> Lookup(LookupOrderRequest request, CancellationToken ct)
+    {
+        var result = await orders.LookupAsync(new LookupOrderQuery(request.OrderId, request.Email), ct);
+        return result.IsSuccess ? result.Value : this.ToProblem(result.Error!);
+    }
+
+    /// <summary>Order status, IVA breakdown, payment attempts and audit trail. For trusted API clients; not routed from the public web.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<OrderDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -47,7 +62,7 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
         return result.IsSuccess ? result.Value : this.ToProblem(result.Error!);
     }
 
-    /// <summary>Retries the payment of a declined or failed order, usually with another card.</summary>
+    /// <summary>Retries the payment of a declined or failed order, usually with another card. The buyer's email must match the order.</summary>
     [HttpPost("{id:guid}/payment-retries")]
     [EnableRateLimiting(RateLimitPolicies.Checkout)]
     [ProducesResponseType<OrderDto>(StatusCodes.Status200OK)]
@@ -56,7 +71,7 @@ public sealed class OrdersController(OrderService orders) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<OrderDto>> RetryPayment(Guid id, RetryPaymentRequest request, CancellationToken ct)
     {
-        var result = await orders.RetryPaymentAsync(new RetryPaymentCommand(id, request.Card?.ToDetails()!), ct);
+        var result = await orders.RetryPaymentAsync(new RetryPaymentCommand(id, request.Email, request.Card?.ToDetails()!), ct);
         return result.IsSuccess ? result.Value : this.ToProblem(result.Error!);
     }
 

@@ -52,6 +52,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("PaymentSimulator:Timeout", "00:00:00.300");
         builder.UseSetting("RateLimiting:GlobalPerMinute", "10000");
         builder.UseSetting("RateLimiting:CheckoutPerMinute", "10000");
+        builder.UseSetting("RateLimiting:LookupPerMinute", "10000");
     }
 
     public HttpClient CreateAuthenticatedClient()

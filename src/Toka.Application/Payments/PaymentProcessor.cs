@@ -77,7 +77,7 @@ public sealed class PaymentProcessor(
         try
         {
             return await gateway.AuthorizeAsync(
-                new PaymentRequest(order.Id, order.NextAttemptNumber, order.Total, order.Currency, card), ct);
+                new PaymentRequest(order.Id, order.NextAttemptNumber, order.Total, order.Currency, order.Installments, card), ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {

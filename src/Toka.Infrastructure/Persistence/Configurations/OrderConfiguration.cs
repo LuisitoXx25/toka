@@ -10,7 +10,11 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> b)
     {
-        b.ToTable("orders", t => t.HasCheckConstraint("ck_orders_tax_breakdown", "subtotal + tax_amount = total"));
+        b.ToTable("orders", t =>
+        {
+            t.HasCheckConstraint("ck_orders_tax_breakdown", "subtotal + tax_amount = total");
+            t.HasCheckConstraint("ck_orders_installments_positive", "installments >= 1");
+        });
         b.HasKey(o => o.Id);
         b.Property(o => o.UnitPrice).HasPrecision(12, 2);
         b.Property(o => o.Subtotal).HasPrecision(12, 2);
@@ -24,6 +28,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         b.Property(o => o.FailureReason).HasMaxLength(500);
         b.Ignore(o => o.CanRetryPayment);
         b.Ignore(o => o.NextAttemptNumber);
+        b.Ignore(o => o.MonthlyPayment);
+        b.Property(o => o.Installments).HasDefaultValue(1);
 
         // Unique key also protects against two concurrent requests with the same key.
         b.HasIndex(o => o.IdempotencyKey).IsUnique().HasFilter("idempotency_key IS NOT NULL");

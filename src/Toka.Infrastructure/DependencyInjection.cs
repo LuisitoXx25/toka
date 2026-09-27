@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLog, AuditLog>();
 
         services.Configure<PaymentOptions>(configuration.GetSection(PaymentOptions.Section));
+        services.Configure<InstallmentOptions>(configuration.GetSection(InstallmentOptions.Section));
         services.Configure<SimulatorOptions>(configuration.GetSection(SimulatorOptions.Section));
         services.AddSingleton<SimulatedPaymentGateway>();
         services.AddSingleton<IPaymentGateway>(sp => new TimeoutPaymentGateway(

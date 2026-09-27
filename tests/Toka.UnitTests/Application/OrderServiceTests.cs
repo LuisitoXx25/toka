@@ -27,13 +27,13 @@ public class OrderServiceTests
         var processor = new PaymentProcessor(_gateway, _store, _store, clock,
             Options.Create(new PaymentOptions { BaseRetryDelay = TimeSpan.Zero }), NullLogger<PaymentProcessor>.Instance);
 
-        _service = new OrderService(_store, _store, customers, processor, _store, _store,
-            new PlaceOrderValidator(customerValidator, cardValidator), new RetryPaymentValidator(cardValidator),
+        _service = new OrderService(_store, _store, _store, customers, processor, Installments.Policy, _store, _store,
+            new PlaceOrderValidator(customerValidator, cardValidator), new RetryPaymentValidator(cardValidator), new LookupOrderValidator(),
             clock, NullLogger<OrderService>.Instance);
     }
 
-    private PlaceOrderCommand Command(Guid productId, int quantity = 1, string? key = null) => new(
-        new CustomerInput("Ana", "López", "Ana@Correo.MX", null), productId, quantity, TestData.Card(), key);
+    private PlaceOrderCommand Command(Guid productId, int quantity = 1, string? key = null, int installments = 1) => new(
+        new CustomerInput("Ana", "López", "Ana@Correo.MX", null), productId, quantity, installments, TestData.Card(), key);
 
     [Fact]
     public async Task Place_registers_customer_creates_order_and_charges()
@@ -112,9 +112,65 @@ public class OrderServiceTests
     }
 
     [Fact]
+    public async Task Installment_plan_is_stored_with_the_monthly_payment()
+    {
+        var product = TestData.Product(price: 3499m);
+        _store.Products.Add(product);
+
+        var result = await _service.PlaceAsync(Command(product.Id, installments: 6), default);
+
+        Assert.Equal(6, result.Value.Order.Installments);
+        Assert.Equal(583.17m, result.Value.Order.MonthlyPayment);
+        Assert.Equal(6, _gateway.Requests.Single().Installments);
+    }
+
+    [Fact]
+    public async Task Installment_plan_below_its_minimum_is_rejected_before_reserving_stock()
+    {
+        var product = TestData.Product(stock: 5, price: 1899m);
+        _store.Products.Add(product);
+
+        var result = await _service.PlaceAsync(Command(product.Id, installments: 6), default);
+
+        Assert.Equal("installments_not_available", result.Error!.Code);
+        Assert.Contains("compra mínima de $3,000.00", result.Error.Message);
+        Assert.Equal(5, product.Stock);
+    }
+
+    [Fact]
+    public async Task Lookup_requires_the_buyer_email()
+    {
+        var product = TestData.Product();
+        _store.Products.Add(product);
+        var placed = await _service.PlaceAsync(Command(product.Id), default);
+        var id = placed.Value.Order.Id;
+
+        var owner = await _service.LookupAsync(new LookupOrderQuery(id, " ANA@correo.mx "), default);
+        var stranger = await _service.LookupAsync(new LookupOrderQuery(id, "otra@correo.mx"), default);
+        var unknown = await _service.LookupAsync(new LookupOrderQuery(Guid.NewGuid(), "ana@correo.mx"), default);
+
+        Assert.True(owner.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, stranger.Error!.Type);
+        Assert.Equal(unknown.Error!.Code, stranger.Error.Code);
+    }
+
+    [Fact]
+    public async Task Retry_payment_with_another_email_is_not_found()
+    {
+        var product = TestData.Product();
+        _store.Products.Add(product);
+        var placed = await _service.PlaceAsync(Command(product.Id), default);
+
+        var result = await _service.RetryPaymentAsync(new RetryPaymentCommand(placed.Value.Order.Id, "otra@correo.mx", TestData.Card()), default);
+
+        Assert.Equal(ErrorType.NotFound, result.Error!.Type);
+        Assert.Single(_gateway.Requests);
+    }
+
+    [Fact]
     public async Task Retry_payment_of_unknown_order_is_not_found()
     {
-        var result = await _service.RetryPaymentAsync(new RetryPaymentCommand(Guid.NewGuid(), TestData.Card()), default);
+        var result = await _service.RetryPaymentAsync(new RetryPaymentCommand(Guid.NewGuid(), "ana@correo.mx", TestData.Card()), default);
 
         Assert.Equal(ErrorType.NotFound, result.Error!.Type);
     }

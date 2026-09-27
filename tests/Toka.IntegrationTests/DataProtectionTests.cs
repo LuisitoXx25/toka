@@ -35,6 +35,17 @@ public class DataProtectionTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task App_role_cannot_change_the_installment_plan()
+    {
+        var orderId = await PlacePaidOrderAsync();
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => ExecuteAsync(factory.AppConnectionString,
+            "UPDATE orders SET installments = 3 WHERE id = @id", orderId));
+
+        Assert.Equal(InsufficientPrivilege, ex.SqlState);
+    }
+
+    [Fact]
     public async Task App_role_cannot_tamper_with_the_audit_trail()
     {
         var orderId = await PlacePaidOrderAsync();
