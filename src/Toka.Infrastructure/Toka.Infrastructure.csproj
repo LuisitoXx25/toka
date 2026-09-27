@@ -18,4 +18,9 @@
   <PropertyGroup>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Toka.UnitTests" />
+    <InternalsVisibleTo Include="Toka.IntegrationTests" />
+  </ItemGroup>
+
 </Project>
