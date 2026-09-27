@@ -18,32 +18,32 @@ public sealed class Product : Entity
 
     public static Product Create(Guid id, string sku, string name, string description, decimal price, string currency, int stock)
     {
-        if (price <= 0) throw new DomainException("validation", "Price must be greater than zero.");
-        if (stock < 0) throw new DomainException("validation", "Stock cannot be negative.");
+        if (price <= 0) throw new DomainException("validation", "El precio debe ser mayor que cero.");
+        if (stock < 0) throw new DomainException("validation", "El inventario no puede ser negativo.");
         return new Product
         {
             Id = id,
-            Sku = Guard.NotBlank(sku, nameof(Sku), 50),
-            Name = Guard.NotBlank(name, nameof(Name), 200),
+            Sku = Guard.NotBlank(sku, "SKU", 50),
+            Name = Guard.NotBlank(name, "nombre del producto", 200),
             Description = description,
             Price = price,
-            Currency = Guard.NotBlank(currency, nameof(Currency), 3),
+            Currency = Guard.NotBlank(currency, "moneda", 3),
             Stock = stock,
         };
     }
 
     public void Reserve(int quantity)
     {
-        Guard.Positive(quantity, nameof(quantity));
+        Guard.Positive(quantity, "cantidad");
         if (quantity > Stock)
-            throw new DomainException("insufficient_stock", $"Only {Stock} unit(s) of '{Sku}' available.");
+            throw new DomainException("insufficient_stock", $"Solo hay {Stock} unidad(es) disponibles del producto '{Name}'.");
         Stock -= quantity;
         Version++;
     }
 
     public void Release(int quantity)
     {
-        Guard.Positive(quantity, nameof(quantity));
+        Guard.Positive(quantity, "cantidad");
         Stock += quantity;
         Version++;
     }

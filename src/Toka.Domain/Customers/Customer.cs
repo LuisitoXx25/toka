@@ -14,13 +14,13 @@ public sealed class Customer : Entity
 
     public static Customer Register(string firstName, string lastName, string email, string? phone, DateTimeOffset now) => new()
     {
-        FirstName = Guard.NotBlank(firstName, nameof(FirstName), 100),
-        LastName = Guard.NotBlank(lastName, nameof(LastName), 100),
+        FirstName = Guard.NotBlank(firstName, "nombre", 100),
+        LastName = Guard.NotBlank(lastName, "apellido", 100),
         Email = NormalizeEmail(email),
         Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
         CreatedAt = now,
     };
 
     public static string NormalizeEmail(string email) =>
-        Guard.NotBlank(email, nameof(Email), 254).ToLowerInvariant();
+        Guard.NotBlank(email, "correo electrónico", 254).ToLowerInvariant();
 }

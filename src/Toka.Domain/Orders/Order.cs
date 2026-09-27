@@ -76,7 +76,7 @@ public sealed class Order : Entity
     public void ReopenForPayment(Product product, DateTimeOffset now)
     {
         if (!CanRetryPayment)
-            throw new DomainException("invalid_order_state", $"Payment cannot be retried for an order in status {Status}.");
+            throw new DomainException("invalid_order_state", $"No se puede reintentar el pago de una orden en estado '{Status.ToDisplayName()}'.");
         EnsureProduct(product);
         product.Reserve(Quantity);
         Status = OrderStatus.PendingPayment;
@@ -97,12 +97,12 @@ public sealed class Order : Entity
     private void EnsureProduct(Product product)
     {
         if (product.Id != ProductId)
-            throw new DomainException("validation", "Product does not belong to this order.");
+            throw new DomainException("validation", "El producto no corresponde a esta orden.");
     }
 
     private void EnsureStatus(OrderStatus expected)
     {
         if (Status != expected)
-            throw new DomainException("invalid_order_state", $"Order is {Status}; expected {expected}.");
+            throw new DomainException("invalid_order_state", $"La orden está en estado '{Status.ToDisplayName()}'; se esperaba '{expected.ToDisplayName()}'.");
     }
 }

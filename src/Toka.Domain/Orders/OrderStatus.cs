@@ -10,3 +10,16 @@ public enum OrderStatus
     /// <summary>Gateway unavailable after all retries. Stock released; payment can be retried.</summary>
     PaymentFailed = 3,
 }
+
+public static class OrderStatusExtensions
+{
+    /// <summary>Spanish label for user-facing messages.</summary>
+    public static string ToDisplayName(this OrderStatus status) => status switch
+    {
+        OrderStatus.PendingPayment => "pendiente de pago",
+        OrderStatus.Paid => "pagada",
+        OrderStatus.PaymentDeclined => "pago rechazado",
+        OrderStatus.PaymentFailed => "pago fallido",
+        _ => status.ToString(),
+    };
+}
