@@ -48,8 +48,8 @@ public sealed class OrderService(
             order = Order.Place(customer.Id, product, command.Quantity, command.IdempotencyKey, clock.GetUtcNow());
             orders.Add(order);
             audit.Record(AuditEvents.OrderCreated,
-                $"Orden creada: {order.Quantity} × {product.Name}, total {order.Total:N2} {order.Currency}.",
-                nameof(Order), order.Id, new { order.CustomerId, order.ProductId, order.Quantity, order.Total });
+                $"Orden creada: {order.Quantity} × {product.Name}. Subtotal {order.Subtotal:N2} + IVA {order.TaxAmount:N2} = {order.Total:N2} {order.Currency}.",
+                nameof(Order), order.Id, new { order.CustomerId, order.ProductId, order.Quantity, order.UnitPrice, order.Subtotal, order.TaxRate, order.TaxAmount, order.Total, order.Currency });
             RecordStockReserved(order, product);
             await unitOfWork.SaveChangesAsync(ct);
         }

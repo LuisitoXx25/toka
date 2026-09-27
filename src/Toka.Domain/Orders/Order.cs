@@ -11,6 +11,11 @@ public sealed class Order : Entity
     public Guid ProductId { get; private set; }
     public int Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
+    /// <summary>Amount before IVA.</summary>
+    public decimal Subtotal { get; private set; }
+    public decimal TaxRate { get; private set; }
+    public decimal TaxAmount { get; private set; }
+    /// <summary>Amount charged to the card, IVA included.</summary>
     public decimal Total { get; private set; }
     public string Currency { get; private set; } = null!;
     public OrderStatus Status { get; private set; }
@@ -26,17 +31,25 @@ public sealed class Order : Entity
 
     private Order() { }
 
-    /// <summary>Creates an order and reserves stock on the product in one step so both change together.</summary>
+    /// <summary>
+    /// Creates an order and reserves stock on the product in one step so both change together.
+    /// Product prices include IVA; the breakdown is stored so the order keeps the rate in force when it was placed.
+    /// Amounts never change after creation.
+    /// </summary>
     public static Order Place(Guid customerId, Product product, int quantity, string? idempotencyKey, DateTimeOffset now)
     {
         product.Reserve(quantity);
+        var tax = TaxBreakdown.FromTaxIncludedTotal(product.Price * quantity);
         return new Order
         {
             CustomerId = customerId,
             ProductId = product.Id,
             Quantity = quantity,
             UnitPrice = product.Price,
-            Total = product.Price * quantity,
+            Subtotal = tax.Subtotal,
+            TaxRate = tax.TaxRate,
+            TaxAmount = tax.TaxAmount,
+            Total = tax.Total,
             Currency = product.Currency,
             Status = OrderStatus.PendingPayment,
             IdempotencyKey = idempotencyKey,

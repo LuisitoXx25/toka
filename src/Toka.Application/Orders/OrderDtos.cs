@@ -20,6 +20,9 @@ public sealed record OrderDto(
     Guid ProductId,
     int Quantity,
     decimal UnitPrice,
+    decimal Subtotal,
+    decimal TaxRate,
+    decimal TaxAmount,
     decimal Total,
     string Currency,
     string Status,
@@ -33,7 +36,7 @@ public sealed record OrderDto(
     IReadOnlyList<AuditEntry> Events)
 {
     public static OrderDto From(Order o, IReadOnlyList<AuditEntry> events) => new(
-        o.Id, o.CustomerId, o.ProductId, o.Quantity, o.UnitPrice, o.Total, o.Currency,
+        o.Id, o.CustomerId, o.ProductId, o.Quantity, o.UnitPrice, o.Subtotal, o.TaxRate, o.TaxAmount, o.Total, o.Currency,
         o.Status.ToString(), o.Status.ToDisplayName(),
         o.AuthorizationCode, o.FailureReason, o.CanRetryPayment, o.CreatedAt, o.UpdatedAt,
         o.Attempts

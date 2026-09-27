@@ -10,9 +10,12 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> b)
     {
-        b.ToTable("orders");
+        b.ToTable("orders", t => t.HasCheckConstraint("ck_orders_tax_breakdown", "subtotal + tax_amount = total"));
         b.HasKey(o => o.Id);
         b.Property(o => o.UnitPrice).HasPrecision(12, 2);
+        b.Property(o => o.Subtotal).HasPrecision(12, 2);
+        b.Property(o => o.TaxRate).HasPrecision(5, 4);
+        b.Property(o => o.TaxAmount).HasPrecision(12, 2);
         b.Property(o => o.Total).HasPrecision(12, 2);
         b.Property(o => o.Currency).HasMaxLength(3).IsFixedLength();
         b.Property(o => o.Status).HasConversion<string>().HasMaxLength(30);
