@@ -8,7 +8,6 @@ namespace Toka.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/orders")]
-[Produces("application/json")]
 public sealed class OrdersController(OrderService orders) : ControllerBase
 {
     public const string IdempotencyHeader = "Idempotency-Key";

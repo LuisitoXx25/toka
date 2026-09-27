@@ -6,7 +6,6 @@ namespace Toka.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/products")]
-[Produces("application/json")]
 public sealed class ProductsController(ProductService products) : ControllerBase
 {
     /// <summary>Product catalog. Prices include IVA.</summary>

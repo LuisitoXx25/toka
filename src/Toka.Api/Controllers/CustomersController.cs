@@ -7,7 +7,6 @@ namespace Toka.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/customers")]
-[Produces("application/json")]
 public sealed class CustomersController(CustomerService customers) : ControllerBase
 {
     /// <summary>Registers a new customer.</summary>

@@ -29,7 +29,7 @@ public static class ResultExtensions
         problem.Extensions["code"] = error.Code;
         Problems.Enrich(problem, controller.HttpContext);
 
-        return new ObjectResult(problem) { StatusCode = status };
+        return new ObjectResult(problem) { StatusCode = status, ContentTypes = { Problems.ContentType } };
     }
 
     // "Customer.Email" → "customer.email", so keys match the JSON field names the client sent.
