@@ -24,16 +24,16 @@ public class OrderServiceTests
         var customerValidator = new CustomerInputValidator();
         var cardValidator = new CardValidator(clock);
         var customers = new CustomerService(_store, _store, _store, customerValidator, clock);
-        var processor = new PaymentProcessor(_gateway, _store, _store, clock,
+        var processor = new PaymentProcessor(_gateway, new FakeBinLookup(), _store, _store, clock,
             Options.Create(new PaymentOptions { BaseRetryDelay = TimeSpan.Zero }), NullLogger<PaymentProcessor>.Instance);
 
-        _service = new OrderService(_store, _store, _store, customers, processor, Installments.Policy, _store, _store,
+        _service = new OrderService(_store, _store, _store, customers, processor, Installments.Policy, new FakeBinLookup(), _store, _store,
             new PlaceOrderValidator(customerValidator, cardValidator), new RetryPaymentValidator(cardValidator), new LookupOrderValidator(),
             clock, NullLogger<OrderService>.Instance);
     }
 
-    private PlaceOrderCommand Command(Guid productId, int quantity = 1, string? key = null, int installments = 1) => new(
-        new CustomerInput("Ana", "López", "Ana@Correo.MX", null), productId, quantity, installments, TestData.Card(), key);
+    private PlaceOrderCommand Command(Guid productId, int quantity = 1, string? key = null, int installments = 1, string card = "4111111111111111") => new(
+        new CustomerInput("Ana", "López", "Ana@Correo.MX", null), productId, quantity, installments, TestData.Card(card), key);
 
     [Fact]
     public async Task Place_registers_customer_creates_order_and_charges()
@@ -119,8 +119,10 @@ public class OrderServiceTests
 
         var result = await _service.PlaceAsync(Command(product.Id, installments: 6), default);
 
-        Assert.Equal(6, result.Value.Order.Installments);
-        Assert.Equal(583.17m, result.Value.Order.MonthlyPayment);
+        var order = result.Value.Order;
+        Assert.Equal(6, order.Installments);
+        Assert.Equal((583.20m, 583.16m), (order.FirstPayment, order.MonthlyPayment));
+        Assert.Equal("6 pagos de $583.16 sin intereses; el primero de $583.20", order.PaymentPlan);
         Assert.Equal(6, _gateway.Requests.Single().Installments);
     }
 
@@ -135,6 +137,31 @@ public class OrderServiceTests
         Assert.Equal("installments_not_available", result.Error!.Code);
         Assert.Contains("compra mínima de $3,000.00", result.Error.Message);
         Assert.Equal(5, product.Stock);
+    }
+
+    [Fact]
+    public async Task Debit_card_cannot_use_installments()
+    {
+        var product = TestData.Product(stock: 5, price: 3499m);
+        _store.Products.Add(product);
+
+        var result = await _service.PlaceAsync(Command(product.Id, installments: 3, card: FakeBinLookup.DebitCard), default);
+
+        Assert.Equal("installments_not_available", result.Error!.Code);
+        Assert.Equal(InstallmentPolicy.DebitNotEligible, result.Error.Message);
+        Assert.Equal(5, product.Stock);
+    }
+
+    [Fact]
+    public async Task Debit_card_pays_single_payment_and_is_recorded_as_debit()
+    {
+        var product = TestData.Product();
+        _store.Products.Add(product);
+
+        var result = await _service.PlaceAsync(Command(product.Id, card: FakeBinLookup.DebitCard), default);
+
+        Assert.Equal("Debit", result.Value.Order.Attempts.Single().CardType);
+        Assert.Equal("Débito", result.Value.Order.Attempts.Single().CardTypeDisplay);
     }
 
     [Fact]

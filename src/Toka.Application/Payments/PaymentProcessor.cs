@@ -8,6 +8,7 @@ namespace Toka.Application.Payments;
 
 public sealed class PaymentProcessor(
     IPaymentGateway gateway,
+    ICardBinLookup binLookup,
     IUnitOfWork unitOfWork,
     IAuditLog audit,
     TimeProvider clock,
@@ -24,15 +25,16 @@ public sealed class PaymentProcessor(
     /// </summary>
     public async Task ProcessAsync(Order order, Product product, CardDetails card, CancellationToken ct)
     {
+        var cardType = binLookup.Lookup(card.Number);
         for (var i = 1; i <= _options.MaxAttempts; i++)
         {
             var response = await AuthorizeSafelyAsync(order, card, ct);
             var attempt = order.RecordAttempt(response.Outcome, response.ResponseCode, response.Message,
-                response.AuthorizationCode, card.Last4, card.Brand, clock.GetUtcNow());
+                response.AuthorizationCode, card.Last4, card.Brand, cardType, clock.GetUtcNow());
             audit.Record(AuditEvents.PaymentAttempted,
-                $"Intento de pago #{attempt.AttemptNumber}: {DescribeOutcome(attempt.Outcome)} (tarjeta ****{attempt.CardLast4}).",
+                $"Intento de pago #{attempt.AttemptNumber}: {DescribeOutcome(attempt.Outcome)} (tarjeta de {cardType.ToDisplayName().ToLowerInvariant()} ****{attempt.CardLast4}).",
                 nameof(Order), order.Id,
-                new { attempt.AttemptNumber, Outcome = attempt.Outcome.ToString(), attempt.ResponseCode });
+                new { attempt.AttemptNumber, Outcome = attempt.Outcome.ToString(), attempt.ResponseCode, CardType = cardType.ToString() });
 
             logger.LogInformation("Payment attempt {AttemptNumber} for order {OrderId}: {Outcome} ({ResponseCode})",
                 attempt.AttemptNumber, order.Id, response.Outcome, response.ResponseCode);

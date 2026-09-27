@@ -16,6 +16,7 @@ internal sealed class PaymentAttemptConfiguration : IEntityTypeConfiguration<Pay
         b.Property(a => a.AuthorizationCode).HasMaxLength(50);
         b.Property(a => a.CardLast4).HasMaxLength(4).IsFixedLength();
         b.Property(a => a.CardBrand).HasMaxLength(20);
+        b.Property(a => a.CardType).HasConversion<string>().HasMaxLength(10);
         b.HasIndex(a => new { a.OrderId, a.AttemptNumber }).IsUnique();
     }
 }

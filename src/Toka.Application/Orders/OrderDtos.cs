@@ -15,7 +15,7 @@ public sealed record RetryPaymentCommand(Guid OrderId, string CustomerEmail, Car
 public sealed record LookupOrderQuery(Guid OrderId, string CustomerEmail);
 
 public sealed record PaymentAttemptDto(int AttemptNumber, string Outcome, string ResponseCode, string? Message,
-    string CardBrand, string CardLast4, DateTimeOffset OccurredAt);
+    string CardBrand, string CardLast4, string CardType, string CardTypeDisplay, DateTimeOffset OccurredAt);
 
 /// <param name="Status">Technical status code (e.g. PaymentDeclined).</param>
 /// <param name="StatusDisplay">Status label in Spanish for the UI.</param>
@@ -31,7 +31,9 @@ public sealed record OrderDto(
     decimal Total,
     string Currency,
     int Installments,
+    decimal FirstPayment,
     decimal MonthlyPayment,
+    string PaymentPlan,
     string Status,
     string StatusDisplay,
     string? AuthorizationCode,
@@ -43,13 +45,13 @@ public sealed record OrderDto(
     IReadOnlyList<AuditEntry> Events)
 {
     public static OrderDto From(Order o, IReadOnlyList<AuditEntry> events) => new(
-        o.Id, o.CustomerId, o.ProductId, o.Quantity, o.UnitPrice, o.Subtotal, o.TaxRate, o.TaxAmount, o.Total, o.Currency, o.Installments, o.MonthlyPayment,
+        o.Id, o.CustomerId, o.ProductId, o.Quantity, o.UnitPrice, o.Subtotal, o.TaxRate, o.TaxAmount, o.Total, o.Currency, o.Installments, o.Schedule.FirstPayment, o.Schedule.RegularPayment, InstallmentPolicy.Describe(o.Schedule),
         o.Status.ToString(), o.Status.ToDisplayName(),
         o.AuthorizationCode, o.FailureReason, o.CanRetryPayment, o.CreatedAt, o.UpdatedAt,
         o.Attempts
             .OrderBy(a => a.AttemptNumber)
             .Select(a => new PaymentAttemptDto(a.AttemptNumber, a.Outcome.ToString(), a.ResponseCode, a.Message,
-                a.CardBrand, a.CardLast4, a.OccurredAt))
+                a.CardBrand, a.CardLast4, a.CardType.ToString(), a.CardType.ToDisplayName(), a.OccurredAt))
             .ToList(),
         events);
 }

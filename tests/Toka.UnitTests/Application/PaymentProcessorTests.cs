@@ -18,7 +18,7 @@ public class PaymentProcessorTests
     public PaymentProcessorTests() => _order = Order.Place(Guid.NewGuid(), _product, 2, 1, null, TestData.Now);
 
     private PaymentProcessor Processor(IPaymentGateway gateway) => new(
-        gateway, _store, _store, new FakeTimeProvider(TestData.Now),
+        gateway, new FakeBinLookup(), _store, _store, new FakeTimeProvider(TestData.Now),
         Options.Create(new PaymentOptions { MaxAttempts = 3, BaseRetryDelay = TimeSpan.Zero }),
         NullLogger<PaymentProcessor>.Instance);
 

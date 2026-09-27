@@ -18,6 +18,7 @@ public sealed class OrderService(
     CustomerService customerService,
     PaymentProcessor paymentProcessor,
     InstallmentPolicy installments,
+    ICardBinLookup binLookup,
     IUnitOfWork unitOfWork,
     IAuditLog audit,
     IValidator<PlaceOrderCommand> placeValidator,
@@ -44,7 +45,7 @@ public sealed class OrderService(
         if (await products.GetByIdAsync(command.ProductId, ct) is not { } product)
             return Error.NotFound("el producto", command.ProductId);
 
-        if (installments.Reject(command.Installments, product.Price * command.Quantity) is { } reason)
+        if (installments.Reject(command.Installments, product.Price * command.Quantity, binLookup.Lookup(command.Card.Number)) is { } reason)
             return new Error("installments_not_available", reason, ErrorType.BusinessRule);
 
         // Customer, order and stock reservation are committed together, before talking to the payment gateway.
@@ -82,6 +83,10 @@ public sealed class OrderService(
             return Error.NotFound("la orden", command.OrderId);
         var product = await products.GetByIdAsync(order.ProductId, ct)
             ?? throw new InvalidOperationException($"Product {order.ProductId} of order {order.Id} is missing.");
+
+        // The plan was fixed when the order was placed; a debit card can only retry single-payment orders.
+        if (order.Installments > 1 && binLookup.Lookup(command.Card.Number) == CardType.Debit)
+            return new Error("installments_not_available", InstallmentPolicy.DebitNotEligible, ErrorType.BusinessRule);
 
         try
         {
@@ -141,7 +146,7 @@ public sealed class OrderService(
         OrderDto.From(order, await audit.GetForEntityAsync(order.Id, ct));
 
     private static string DescribeInstallments(Order order) =>
-        order.Installments > 1 ? $", en {InstallmentPolicy.Describe(order.Installments, order.MonthlyPayment)}" : "";
+        order.Installments > 1 ? $", en {InstallmentPolicy.Describe(order.Schedule)}" : "";
 
     private static Error ConcurrencyError() =>
         new("concurrency_conflict", "El inventario cambió mientras se procesaba la orden. Intenta de nuevo.", ErrorType.Conflict);

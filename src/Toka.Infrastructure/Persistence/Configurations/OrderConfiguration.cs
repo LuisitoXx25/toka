@@ -28,7 +28,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         b.Property(o => o.FailureReason).HasMaxLength(500);
         b.Ignore(o => o.CanRetryPayment);
         b.Ignore(o => o.NextAttemptNumber);
-        b.Ignore(o => o.MonthlyPayment);
+        b.Ignore(o => o.Schedule);
         b.Property(o => o.Installments).HasDefaultValue(1);
 
         // Unique key also protects against two concurrent requests with the same key.

@@ -65,14 +65,14 @@ public sealed class Order : Entity
 
     public int NextAttemptNumber => _attempts.Count + 1;
 
-    /// <summary>Amount of each monthly payment. MSI carries no interest, so it is simply the total split evenly.</summary>
-    public decimal MonthlyPayment => Math.Round(Total / Installments, 2, MidpointRounding.AwayFromZero);
+    /// <summary>How the total is split across the monthly payments (MSI carries no interest).</summary>
+    public InstallmentSchedule Schedule => InstallmentSchedule.Of(Total, Installments);
 
     public PaymentAttempt RecordAttempt(PaymentOutcome outcome, string responseCode, string? message,
-        string? authorizationCode, string cardLast4, string cardBrand, DateTimeOffset now)
+        string? authorizationCode, string cardLast4, string cardBrand, CardType cardType, DateTimeOffset now)
     {
         EnsureStatus(OrderStatus.PendingPayment);
-        var attempt = new PaymentAttempt(Id, NextAttemptNumber, outcome, responseCode, message, authorizationCode, cardLast4, cardBrand, now);
+        var attempt = new PaymentAttempt(Id, NextAttemptNumber, outcome, responseCode, message, authorizationCode, cardLast4, cardBrand, cardType, now);
         _attempts.Add(attempt);
         UpdatedAt = now;
         return attempt;
@@ -97,7 +97,7 @@ public sealed class Order : Entity
     public void ReopenForPayment(Product product, DateTimeOffset now)
     {
         if (!CanRetryPayment)
-            throw new DomainException("invalid_order_state", $"No se puede reintentar el pago de una orden en estado '{Status.ToDisplayName()}'.");
+            throw new DomainException("invalid_order_state", $"No se puede reintentar el pago: la orden tiene estado «{Status.ToDisplayName()}».");
         EnsureProduct(product);
         product.Reserve(Quantity);
         Status = OrderStatus.PendingPayment;
@@ -124,6 +124,6 @@ public sealed class Order : Entity
     private void EnsureStatus(OrderStatus expected)
     {
         if (Status != expected)
-            throw new DomainException("invalid_order_state", $"La orden está en estado '{Status.ToDisplayName()}'; se esperaba '{expected.ToDisplayName()}'.");
+            throw new DomainException("invalid_order_state", $"La orden tiene estado «{Status.ToDisplayName()}»; se esperaba «{expected.ToDisplayName()}».");
     }
 }

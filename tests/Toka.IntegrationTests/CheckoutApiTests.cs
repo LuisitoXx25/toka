@@ -18,7 +18,7 @@ public class CheckoutApiTests(ApiFactory factory)
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var order = await response.JsonAsync();
         Assert.Equal("Paid", (string?)order["status"]);
-        Assert.Equal("pagada", (string?)order["statusDisplay"]);
+        Assert.Equal("Pago aprobado", (string?)order["statusDisplay"]);
         Assert.Equal(6998m, (decimal)order["total"]!);
         Assert.Equal(6032.76m, (decimal)order["subtotal"]!);
         Assert.Equal(965.24m, (decimal)order["taxAmount"]!);
@@ -120,11 +120,14 @@ public class CheckoutApiTests(ApiFactory factory)
     [Fact]
     public async Task Installment_plans_depend_on_the_amount()
     {
-        var plans = await (await _client.GetAsync("/api/v1/installment-plans?amount=1899")).JsonAsync();
+        var credit = await (await _client.GetAsync("/api/v1/installment-plans?amount=1899&bin=411111")).JsonAsync();
+        var debit = await (await _client.GetAsync("/api/v1/installment-plans?amount=1899&bin=400005")).JsonAsync();
 
-        Assert.Equal([1, 3], plans.AsArray().Select(p => (int)p!["months"]!));
-        Assert.Equal("3 pagos de $633.00 sin intereses", (string?)plans[1]!["label"]);
-        Assert.Equal(633m, (decimal)plans[1]!["monthlyPayment"]!);
+        Assert.Equal("Crédito", (string?)credit["cardTypeDisplay"]);
+        Assert.Equal([1, 3], credit["plans"]!.AsArray().Select(p => (int)p!["months"]!));
+        Assert.Equal("3 pagos de $633.00 sin intereses", (string?)credit["plans"]![1]!["label"]);
+        Assert.Equal("Débito", (string?)debit["cardTypeDisplay"]);
+        Assert.Equal([1], debit["plans"]!.AsArray().Select(p => (int)p!["months"]!));
     }
 
     [Fact]
@@ -134,8 +137,9 @@ public class CheckoutApiTests(ApiFactory factory)
 
         Assert.Equal("Paid", (string?)order["status"]);
         Assert.Equal(6, (int)order["installments"]!);
-        Assert.Equal(583.17m, (decimal)order["monthlyPayment"]!);
-        Assert.Contains("en 6 pagos de $583.17 sin intereses", (string?)order["events"]![0]!["description"]);
+        Assert.Equal(583.20m, (decimal)order["firstPayment"]!);
+        Assert.Equal(583.16m, (decimal)order["monthlyPayment"]!);
+        Assert.Contains("en 6 pagos de $583.16 sin intereses; el primero de $583.20", (string?)order["events"]![0]!["description"]);
     }
 
     [Fact]
@@ -145,6 +149,18 @@ public class CheckoutApiTests(ApiFactory factory)
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal("installments_not_available", (string?)(await response.JsonAsync())["code"]);
+    }
+
+    [Fact]
+    public async Task Debit_card_is_accepted_only_for_a_single_payment()
+    {
+        var single = await (await _client.PlaceAsync(Checkout.Order(Checkout.DebitCard))).JsonAsync();
+        var installments = await _client.PlaceAsync(Checkout.Order(Checkout.DebitCard, installments: 3));
+
+        Assert.Equal("Paid", (string?)single["status"]);
+        Assert.Equal("Debit", (string?)single["attempts"]![0]!["cardType"]);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, installments.StatusCode);
+        Assert.Contains("solo aplican con tarjeta de crédito", (string?)(await installments.JsonAsync())["detail"]);
     }
 
     [Fact]

@@ -11,6 +11,7 @@ internal static class Checkout
     public static readonly Guid Monitor = Guid.Parse("0199a0d4-0000-7000-8000-000000000004");
 
     public const string ApprovedCard = "4111111111111111";
+    public const string DebitCard = "4000056655665556";
     public const string DeclinedCard = "4000000000000002";
     public const string AlwaysFailsCard = "4000000000000119";
     public const string FailsOnceCard = "4000000000000259";

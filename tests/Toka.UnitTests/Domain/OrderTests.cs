@@ -33,7 +33,7 @@ public class OrderTests
     {
         var order = Order.Place(_customerId, TestData.Product(price: 3499m), 1, 3, null, TestData.Now);
 
-        Assert.Equal(1166.33m, order.MonthlyPayment);
+        Assert.Equal(new InstallmentSchedule(3, 1166.34m, 1166.33m), order.Schedule);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class OrderTests
         var ex = Assert.Throws<DomainException>(() => order.ReopenForPayment(product, TestData.Now));
 
         Assert.Equal("invalid_order_state", ex.Code);
-        Assert.Contains("'pagada'", ex.Message);
+        Assert.Contains("«Pago aprobado»", ex.Message);
     }
 
     [Fact]
@@ -94,8 +94,8 @@ public class OrderTests
     {
         var order = Order.Place(_customerId, TestData.Product(), 1, 1, null, TestData.Now);
 
-        order.RecordAttempt(PaymentOutcome.TransientError, "processing_error", null, null, "1111", "VISA", TestData.Now);
-        order.RecordAttempt(PaymentOutcome.Approved, "approved", null, "AUTH-1", "1111", "VISA", TestData.Now);
+        order.RecordAttempt(PaymentOutcome.TransientError, "processing_error", null, null, "1111", "VISA", CardType.Credit, TestData.Now);
+        order.RecordAttempt(PaymentOutcome.Approved, "approved", null, "AUTH-1", "1111", "VISA", CardType.Credit, TestData.Now);
 
         Assert.Equal([1, 2], order.Attempts.Select(a => a.AttemptNumber));
     }
@@ -107,6 +107,6 @@ public class OrderTests
         order.MarkPaid("AUTH-1", TestData.Now);
 
         Assert.Throws<DomainException>(() =>
-            order.RecordAttempt(PaymentOutcome.Approved, "approved", null, "AUTH-2", "1111", "VISA", TestData.Now));
+            order.RecordAttempt(PaymentOutcome.Approved, "approved", null, "AUTH-2", "1111", "VISA", CardType.Credit, TestData.Now));
     }
 }

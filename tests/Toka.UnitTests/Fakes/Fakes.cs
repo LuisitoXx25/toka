@@ -75,3 +75,12 @@ internal static class Installments
         Plans = [new() { Months = 3, MinimumAmount = 1500m }, new() { Months = 6, MinimumAmount = 3000m }],
     }));
 }
+
+/// <summary>Same rule as the simulator: BINs 400005 and 520082 are debit, anything else credit.</summary>
+internal sealed class FakeBinLookup : ICardBinLookup
+{
+    public const string DebitCard = "4000056655665556";
+
+    public CardType Lookup(string cardNumberOrBin) =>
+        cardNumberOrBin.StartsWith("400005") || cardNumberOrBin.StartsWith("520082") ? CardType.Debit : CardType.Credit;
+}

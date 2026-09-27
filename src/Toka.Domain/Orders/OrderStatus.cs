@@ -13,13 +13,13 @@ public enum OrderStatus
 
 public static class OrderStatusExtensions
 {
-    /// <summary>Spanish label for user-facing messages.</summary>
+    /// <summary>Formal Spanish label for the UI and messages.</summary>
     public static string ToDisplayName(this OrderStatus status) => status switch
     {
-        OrderStatus.PendingPayment => "pendiente de pago",
-        OrderStatus.Paid => "pagada",
-        OrderStatus.PaymentDeclined => "pago rechazado",
-        OrderStatus.PaymentFailed => "pago fallido",
+        OrderStatus.PendingPayment => "Pago en proceso",
+        OrderStatus.Paid => "Pago aprobado",
+        OrderStatus.PaymentDeclined => "Pago rechazado",
+        OrderStatus.PaymentFailed => "Pago no procesado",
         _ => status.ToString(),
     };
 }

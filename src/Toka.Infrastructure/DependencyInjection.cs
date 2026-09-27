@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.Configure<InstallmentOptions>(configuration.GetSection(InstallmentOptions.Section));
         services.Configure<SimulatorOptions>(configuration.GetSection(SimulatorOptions.Section));
         services.AddSingleton<SimulatedPaymentGateway>();
+        services.AddSingleton<ICardBinLookup, SimulatedCardBinLookup>();
         services.AddSingleton<IPaymentGateway>(sp => new TimeoutPaymentGateway(
             sp.GetRequiredService<SimulatedPaymentGateway>(),
             sp.GetRequiredService<IOptions<SimulatorOptions>>(),
