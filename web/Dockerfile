@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build
 
 # Unprivileged nginx: runs as a non-root user and listens on 8080.
-FROM nginxinc/nginx-unprivileged:1.29-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 # The base image can lag behind Alpine security fixes; apply them at build time, then drop back to the non-root user.
 USER root
 RUN apk upgrade --no-cache
