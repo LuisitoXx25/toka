@@ -6,6 +6,7 @@ import { useToast } from '../../components/toastContext'
 import { Alert, Button, Field, Reference, SelectField } from '../../components/ui'
 import { describeInstallments, formatMoney } from '../../lib/format'
 import { onlyDigits } from '../../lib/card'
+import { formatPhone } from '../../lib/phone'
 import { purchases } from '../../lib/purchases'
 import { useSessionState } from '../../lib/storage'
 import { fromApiErrors, validateCard, validateContact, type CardForm, type ContactForm, type FieldErrors } from '../../lib/validation'
@@ -152,6 +153,20 @@ export function CheckoutPage() {
     setOrder(updated)
   }
 
+  /** Forgets everything typed in this tab: contact, selection, result and pending idempotency key. */
+  function clearForm() {
+    setContact(emptyContact)
+    setProductId(products.find((p) => p.stock > 0)?.id ?? null)
+    setQuantity(1)
+    setInstallments(1)
+    setStep(1)
+    setOrder(null)
+    setIdempotencyKey(null)
+    setCard(emptyCard)
+    setErrors({})
+    toast.notify('info', 'Datos borrados', 'Se limpió el formulario de compra.')
+  }
+
   function newPurchase() {
     setOrder(null)
     setErrors({})
@@ -169,7 +184,10 @@ export function CheckoutPage() {
   return (
     <div className="checkout">
       <div className="checkout__main">
-        <h1 className="page-title">Finalizar compra</h1>
+        <div className="page-header">
+          <h1 className="page-title">Finalizar compra</h1>
+          <button type="button" className="link-button" onClick={clearForm} disabled={submitting}>Limpiar datos</button>
+        </div>
 
         {order ? (
           <PaymentResult order={order} email={contact.email.trim()} onUpdated={updateOrder} onNewPurchase={newPurchase} />
@@ -203,13 +221,14 @@ export function CheckoutPage() {
             <Step number={2} title="Datos de contacto" state={stepState(2)} onEdit={() => setStep(2)} editDisabled={submitting}
               summary={<>{contact.firstName} {contact.lastName} · {contact.email}</>}>
               <div className="grid">
-                <Field label="Nombre" autoComplete="given-name" value={contact.firstName} onChange={setContactField('firstName')}
+                <Field label="Nombre" name="given-name" autoComplete="given-name" value={contact.firstName} onChange={setContactField('firstName')}
                   error={errors['customer.firstName']} />
-                <Field label="Apellido" autoComplete="family-name" value={contact.lastName} onChange={setContactField('lastName')}
+                <Field label="Apellido" name="family-name" autoComplete="family-name" value={contact.lastName} onChange={setContactField('lastName')}
                   error={errors['customer.lastName']} />
-                <Field label="Correo electrónico" type="email" autoComplete="email" value={contact.email} onChange={setContactField('email')}
-                  error={errors['customer.email']} hint="Lo necesitarás para consultar tu compra." />
-                <Field label="Teléfono (opcional)" type="tel" autoComplete="tel" value={contact.phone} onChange={setContactField('phone')}
+                <Field label="Correo electrónico" name="email" type="email" autoComplete="email" value={contact.email} onChange={setContactField('email')}
+                  error={errors['customer.email']} />
+                <Field label="Teléfono (opcional)" name="tel" type="tel" inputMode="tel" autoComplete="tel" placeholder="55 1234 5678"
+                  value={contact.phone} onChange={(e) => setContact({ ...contact, phone: formatPhone(e.target.value) })}
                   error={errors['customer.phone']} />
               </div>
               <div className="actions">

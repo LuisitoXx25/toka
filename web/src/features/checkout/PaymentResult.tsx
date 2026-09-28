@@ -51,6 +51,13 @@ export function PaymentResult({ order, email, onUpdated, onNewPurchase }: Props)
       <h2 id="result-title" className="section__title">{declined ? 'Pagar con otra tarjeta' : 'Intentar de nuevo'}</h2>
       <p className="muted">Orden <code>{order.id}</code>. El producto se aparta de nuevo al reintentar.</p>
       <RetryPaymentForm order={order} email={email} onUpdated={onUpdated} />
+      <div className="result__alternative">
+        <p className="muted">
+          No hay ningún pago pendiente: la orden quedó cerrada sin cobro y el producto volvió al inventario.
+          Puedes reintentarla después desde Mis compras.
+        </p>
+        <Button variant="secondary" onClick={onNewPurchase}>Hacer otra compra</Button>
+      </div>
     </section>
   )
 }

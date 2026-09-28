@@ -1,12 +1,23 @@
 export const onlyDigits = (value: string) => value.replace(/\D/g, '')
 
-/** Groups digits in blocks of 4 (Amex: 4-6-5) for display while typing. */
+export const MAX_CARD_DIGITS = 19
+
+/** Groups characters in blocks of 4 (Amex: 4-6-5). */
+function group(chars: string, amex: boolean) {
+  if (amex) return [chars.slice(0, 4), chars.slice(4, 10), chars.slice(10, 15)].filter(Boolean).join(' ')
+  return chars.replace(/(.{4})(?=.)/g, '$1 ')
+}
+
+/** Groups digits for display, e.g. "4111 1111 1111 1111". */
 export function formatCardNumber(value: string) {
-  const digits = onlyDigits(value).slice(0, 19)
-  if (/^3[47]/.test(digits)) {
-    return [digits.slice(0, 4), digits.slice(4, 10), digits.slice(10, 15)].filter(Boolean).join(' ')
-  }
-  return digits.replace(/(\d{4})(?=\d)/g, '$1 ')
+  const digits = onlyDigits(value).slice(0, MAX_CARD_DIGITS)
+  return group(digits, /^3[47]/.test(digits))
+}
+
+/** Hides every digit except the last 4 while keeping the grouping, e.g. "•••• •••• •••• 1111". */
+export function maskCardNumber(digits: string) {
+  const visible = digits.length > 4 ? '•'.repeat(digits.length - 4) + digits.slice(-4) : digits
+  return group(visible, /^3[47]/.test(digits))
 }
 
 /** Formats expiry as MM/AA while typing. */

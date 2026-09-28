@@ -1,18 +1,21 @@
-import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type ButtonHTMLAttributes } from 'react'
+import { useId, type InputHTMLAttributes, type Ref, type ReactNode, type SelectHTMLAttributes, type ButtonHTMLAttributes } from 'react'
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
+  /** Stable field name. Browsers key autocomplete history by name, so every field needs its own. */
+  name: string
   error?: string
   hint?: string
+  inputRef?: Ref<HTMLInputElement>
 }
 
-export function Field({ label, error, hint, className, ...input }: FieldProps) {
+export function Field({ label, error, hint, className, inputRef, ...input }: FieldProps) {
   const id = useId()
   const describedBy = [error && `${id}-error`, hint && `${id}-hint`].filter(Boolean).join(' ') || undefined
   return (
     <div className={`field ${error ? 'field--invalid' : ''} ${className ?? ''}`}>
       <label htmlFor={id}>{label}</label>
-      <input id={id} aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...input} />
+      <input ref={inputRef} id={id} aria-invalid={error ? true : undefined} aria-describedby={describedBy} {...input} />
       {hint && !error && <p id={`${id}-hint`} className="field__hint">{hint}</p>}
       {error && <p id={`${id}-error`} className="field__error">{error}</p>}
     </div>

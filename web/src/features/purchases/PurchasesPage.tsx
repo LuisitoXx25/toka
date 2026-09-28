@@ -134,9 +134,9 @@ function LookupForm({ initialOrderId, onFound }: { initialOrderId: string; onFou
       <h2 className="section__title">Consultar otra compra</h2>
       <p className="muted">Para compras hechas en otro dispositivo, usa el número de orden y el correo de la compra.</p>
       <div className="grid">
-        <Field label="Número de orden" value={orderId} onChange={(e) => setOrderId(e.target.value)} error={errors.orderId}
+        <Field label="Número de orden" name="order-id" value={orderId} onChange={(e) => setOrderId(e.target.value)} error={errors.orderId}
           autoComplete="off" spellCheck={false} />
-        <Field label="Correo electrónico" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
+        <Field label="Correo electrónico" name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)}
           error={errors.email} />
       </div>
       <div className="actions">

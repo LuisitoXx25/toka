@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectBrand, formatCardNumber, formatExpiry, isExpired, parseExpiry, passesLuhn } from './card'
+import { detectBrand, formatCardNumber, formatExpiry, isExpired, maskCardNumber, parseExpiry, passesLuhn } from './card'
 import { fromApiErrors, validateCard } from './validation'
 
 describe('card helpers', () => {
@@ -12,6 +12,12 @@ describe('card helpers', () => {
     expect(formatCardNumber('4111a1111 11111111')).toBe('4111 1111 1111 1111')
     expect(formatCardNumber('378282246310005')).toBe('3782 822463 10005')
     expect(formatExpiry('1230')).toBe('12/30')
+  })
+
+  it('masks all but the last 4 digits, keeping the grouping', () => {
+    expect(maskCardNumber('4111111111111111')).toBe('•••• •••• •••• 1111')
+    expect(maskCardNumber('378282246310005')).toBe('•••• •••••• •0005')
+    expect(maskCardNumber('411')).toBe('411')
   })
 
   it('detects brand', () => {
@@ -48,5 +54,23 @@ describe('installment labels', () => {
     const { describeInstallments } = await import('./format')
     expect(describeInstallments(3, 100)).toBe('3 pagos de $33.33 sin intereses; el primero de $33.34')
     expect(describeInstallments(6, 3000)).toBe('6 pagos de $500.00 sin intereses')
+  })
+})
+
+describe('phone', () => {
+  it('drops letters and symbols and groups digits while typing', async () => {
+    const { formatPhone } = await import('./phone')
+    expect(formatPhone('55abc12-34.5678')).toBe('55 1234 5678')
+    expect(formatPhone('551234567899')).toBe('55 1234 5678')
+    expect(formatPhone('+52 5512345678')).toBe('+52 55 1234 5678')
+  })
+
+  it('accepts 10 digits or +52 plus 10 digits; empty is allowed', async () => {
+    const { isValidPhone } = await import('./phone')
+    expect(isValidPhone('')).toBe(true)
+    expect(isValidPhone('55 1234 5678')).toBe(true)
+    expect(isValidPhone('+52 55 1234 5678')).toBe(true)
+    expect(isValidPhone('55 1234')).toBe(false)
+    expect(isValidPhone('+1 55 1234 5678')).toBe(false)
   })
 })

@@ -1,6 +1,7 @@
 import { Field } from '../../components/ui'
-import { detectBrand, formatCardNumber, formatExpiry, onlyDigits } from '../../lib/card'
+import { detectBrand, formatExpiry, onlyDigits } from '../../lib/card'
 import type { CardForm, FieldErrors } from '../../lib/validation'
+import { CardNumberInput } from './CardNumberInput'
 
 interface Props {
   /** "Crédito" / "Débito" once the API resolved the BIN. */
@@ -18,20 +19,10 @@ export function CardFields({ cardType, value, onChange, errors, disabled }: Prop
 
   return (
     <div className="grid">
-      <Field
-        className="span-2"
-        label="Número de tarjeta"
-        inputMode="numeric"
-        autoComplete="cc-number"
-        placeholder="0000 0000 0000 0000"
-        value={value.number}
-        onChange={(e) => set({ number: formatCardNumber(e.target.value) })}
-        error={errors['card.number']}
-        hint={hint}
-        disabled={disabled}
-      />
+      <CardNumberInput digits={value.number} onDigits={(number) => set({ number })} error={errors['card.number']} hint={hint} disabled={disabled} />
       <Field
         label="Vencimiento"
+        name="cc-exp"
         inputMode="numeric"
         autoComplete="cc-exp"
         placeholder="MM/AA"
@@ -42,9 +33,11 @@ export function CardFields({ cardType, value, onChange, errors, disabled }: Prop
       />
       <Field
         label="CVV"
+        name="cc-csc"
+        type="password"
         inputMode="numeric"
         autoComplete="cc-csc"
-        placeholder="123"
+        placeholder="•••"
         maxLength={4}
         value={value.cvv}
         onChange={(e) => set({ cvv: onlyDigits(e.target.value).slice(0, 4) })}
@@ -54,6 +47,7 @@ export function CardFields({ cardType, value, onChange, errors, disabled }: Prop
       <Field
         className="span-2"
         label="Nombre del titular"
+        name="cc-name"
         autoComplete="cc-name"
         value={value.holderName}
         onChange={(e) => set({ holderName: e.target.value })}

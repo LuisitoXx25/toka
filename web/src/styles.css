@@ -107,7 +107,8 @@ code { font-family: var(--mono); font-size: 0.875em; overflow-wrap: anywhere; }
 
 /* Form controls */
 
-.field { display: grid; gap: 6px; }
+/* align-content: start keeps inputs aligned across a row even when a neighbor shows a hint or error below. */
+.field { display: grid; gap: 6px; align-content: start; }
 .field label { font-size: 0.875rem; font-weight: 500; color: var(--slate-700); }
 .field input, .field select {
   width: 100%; height: 48px; padding: 0 14px;
@@ -376,3 +377,6 @@ code { font-family: var(--mono); font-size: 0.875em; overflow-wrap: anywhere; }
   .purchase-list a { flex-direction: column; align-items: flex-start; }
   .purchase__side { justify-items: start; grid-auto-flow: column; align-items: center; }
 }
+
+.page-header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.result__alternative { display: grid; gap: 12px; padding-top: 20px; margin-top: 8px; border-top: 1px solid var(--line-soft); justify-items: start; }

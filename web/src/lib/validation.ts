@@ -1,4 +1,5 @@
 import { isExpired, onlyDigits, parseExpiry, passesLuhn } from './card'
+import { isValidPhone } from './phone'
 
 export interface ContactForm {
   firstName: string
@@ -24,7 +25,7 @@ export function validateContact(form: ContactForm): FieldErrors {
   if (!form.lastName.trim()) errors['customer.lastName'] = 'Ingresa tu apellido.'
   if (!form.email.trim()) errors['customer.email'] = 'Ingresa tu correo electrónico.'
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors['customer.email'] = 'El correo electrónico no es válido.'
-  if (form.phone.trim() && !/^\+?[0-9 ()-]{7,20}$/.test(form.phone.trim())) errors['customer.phone'] = 'El teléfono no tiene un formato válido.'
+  if (!isValidPhone(form.phone)) errors['customer.phone'] = 'El teléfono debe tener 10 dígitos (o +52 y 10 dígitos).'
   return errors
 }
 
