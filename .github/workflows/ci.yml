@@ -22,7 +22,7 @@ jobs:
     name: Backend · build y pruebas
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -44,7 +44,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -59,7 +59,7 @@ jobs:
     name: SCA · dependencias vulnerables
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -75,7 +75,7 @@ jobs:
     name: Secretos · gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # scan the whole history, not just the last commit
       - name: gitleaks
@@ -95,7 +95,7 @@ jobs:
             context: web
             dockerfile: web/Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t ${{ matrix.image }}:ci -f ${{ matrix.dockerfile }} ${{ matrix.context }}
       - name: Trivy (falla con vulnerabilidades altas o críticas que ya tienen corrección)
         uses: aquasecurity/trivy-action@0.33.1
@@ -110,7 +110,7 @@ jobs:
     needs: [backend, frontend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: ./scripts/init-env.sh
       - run: docker compose up --build --detach --wait --wait-timeout 300
       - run: ./scripts/smoke.sh
