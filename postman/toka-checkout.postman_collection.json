@@ -1,0 +1,884 @@
+{
+  "info": {
+    "_postman_id": "c1827184-c686-438e-8c2f-4cc1845fc0fd",
+    "name": "Toka Checkout API",
+    "description": "Flujo completo del checkout con pruebas automáticas. Ejecutar en orden (Runner o Newman). Requiere el entorno `local` con `baseUrl` y `apiKey` (valor de API_KEY en .env).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-Api-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{apiKey}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Un correo nuevo por corrida para no depender de datos previos.",
+          "if (!pm.collectionVariables.get('email')) {",
+          "  pm.collectionVariables.set('email', `postman.${Date.now()}@correo.mx`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "idempotencyKey",
+      "value": ""
+    },
+    {
+      "key": "paidOrderId",
+      "value": ""
+    },
+    {
+      "key": "declinedOrderId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Catálogo y formas de pago",
+      "item": [
+        {
+          "name": "Listar productos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con 4 productos', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.have.lengthOf(4);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formas de pago con tarjeta de crédito",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/installment-plans?amount=3499&bin=411111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installment-plans"
+              ],
+              "query": [
+                {
+                  "key": "amount",
+                  "value": "3499"
+                },
+                {
+                  "key": "bin",
+                  "value": "411111"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json();",
+                  "pm.test('Crédito: contado, 3 y 6 MSI', () => {",
+                  "  pm.expect(d.cardTypeDisplay).to.eql('Crédito');",
+                  "  pm.expect(d.plans.map(p => p.months)).to.eql([1, 3, 6]);",
+                  "});",
+                  "pm.test('El primer pago absorbe el redondeo', () => {",
+                  "  pm.expect(d.plans[1].label).to.eql('3 pagos de $1,166.33 sin intereses; el primero de $1,166.34');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formas de pago con tarjeta de débito",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/installment-plans?amount=3499&bin=400005",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "installment-plans"
+              ],
+              "query": [
+                {
+                  "key": "amount",
+                  "value": "3499"
+                },
+                {
+                  "key": "bin",
+                  "value": "400005"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Débito: solo contado', () => {",
+                  "  pm.expect(pm.response.json().plans.map(p => p.months)).to.eql([1]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Checkout",
+      "item": [
+        {
+          "name": "Compra aprobada a 3 MSI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"Ana\",\n    \"lastName\": \"López\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"55 1234 5678\"\n  },\n  \"productId\": \"0199a0d4-0000-7000-8000-000000000002\",\n  \"quantity\": 1,\n  \"installments\": 3,\n  \"card\": {\n    \"holderName\": \"ANA LOPEZ\",\n    \"number\": \"4111111111111111\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2030,\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('idempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const o = pm.response.json();",
+                  "pm.collectionVariables.set('paidOrderId', o.id);",
+                  "pm.test('201 y pago aprobado', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(o.status).to.eql('Paid');",
+                  "  pm.expect(o.statusDisplay).to.eql('Pago aprobado');",
+                  "});",
+                  "pm.test('IVA desglosado que cuadra', () => {",
+                  "  pm.expect(o.subtotal + o.taxAmount).to.be.closeTo(o.total, 0.001);",
+                  "  pm.expect(o.taxRate).to.eql(0.16);",
+                  "});",
+                  "pm.test('Pagos MSI suman el total', () => {",
+                  "  pm.expect(o.firstPayment + o.monthlyPayment * (o.installments - 1)).to.be.closeTo(o.total, 0.001);",
+                  "});",
+                  "pm.test('Solo últimos 4 dígitos', () => pm.expect(o.attempts[0].cardLast4).to.eql('1111'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repetir con el mismo Idempotency-Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"Ana\",\n    \"lastName\": \"López\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"55 1234 5678\"\n  },\n  \"productId\": \"0199a0d4-0000-7000-8000-000000000002\",\n  \"quantity\": 1,\n  \"installments\": 3,\n  \"card\": {\n    \"holderName\": \"ANA LOPEZ\",\n    \"number\": \"4111111111111111\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2030,\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con la orden original, sin segundo cobro', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const o = pm.response.json();",
+                  "  pm.expect(o.id).to.eql(pm.collectionVariables.get('paidOrderId'));",
+                  "  pm.expect(o.attempts).to.have.lengthOf(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tarjeta rechazada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"Ana\",\n    \"lastName\": \"López\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"55 1234 5678\"\n  },\n  \"productId\": \"0199a0d4-0000-7000-8000-000000000002\",\n  \"quantity\": 1,\n  \"installments\": 1,\n  \"card\": {\n    \"holderName\": \"ANA LOPEZ\",\n    \"number\": \"4000000000000002\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2030,\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const o = pm.response.json();",
+                  "pm.collectionVariables.set('declinedOrderId', o.id);",
+                  "pm.test('201 con estado rechazado y reintento permitido', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(o.status).to.eql('PaymentDeclined');",
+                  "  pm.expect(o.failureReason).to.eql('Fondos insuficientes.');",
+                  "  pm.expect(o.canRetryPayment).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reintento con otra tarjeta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{declinedOrderId}}/payment-retries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{declinedOrderId}}",
+                "payment-retries"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"card\": {\n    \"holderName\": \"ANA LOPEZ\",\n    \"number\": \"5555555555554444\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2030,\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('La orden queda pagada con dos intentos', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const o = pm.response.json();",
+                  "  pm.expect(o.status).to.eql('Paid');",
+                  "  pm.expect(o.attempts.map(a => a.outcome)).to.eql(['Declined', 'Approved']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Error temporal con reintento automático",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"Ana\",\n    \"lastName\": \"López\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"55 1234 5678\"\n  },\n  \"productId\": \"0199a0d4-0000-7000-8000-000000000002\",\n  \"quantity\": 1,\n  \"installments\": 1,\n  \"card\": {\n    \"holderName\": \"ANA LOPEZ\",\n    \"number\": \"4000000000000259\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2030,\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Se aprueba en el segundo intento', () => {",
+                  "  pm.expect(pm.response.json().attempts.map(a => a.outcome)).to.eql(['TransientError', 'Approved']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Débito con MSI (no permitido)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"Ana\",\n    \"lastName\": \"López\",\n    \"email\": \"{{email}}\",\n    \"phone\": \"55 1234 5678\"\n  },\n  \"productId\": \"0199a0d4-0000-7000-8000-000000000002\",\n  \"quantity\": 1,\n  \"installments\": 3,\n  \"card\": {\n    \"holderName\": \"ANA LOPEZ\",\n    \"number\": \"4000056655665556\",\n    \"expiryMonth\": 12,\n    \"expiryYear\": 2030,\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 con mensaje en español', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p.code).to.eql('installments_not_available');",
+                  "  pm.expect(p.detail).to.include('solo aplican con tarjeta de crédito');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Datos inválidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"firstName\": \"\",\n    \"lastName\": \"L\\u00f3pez\",\n    \"email\": \"no-es-correo\"\n  },\n  \"productId\": \"0199a0d4-0000-7000-8000-000000000002\",\n  \"quantity\": 0,\n  \"card\": {\n    \"holderName\": \"\",\n    \"number\": \"4111111111111112\",\n    \"expiryMonth\": 1,\n    \"expiryYear\": 2020,\n    \"cvv\": \"1\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 con errores por campo', () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const e = pm.response.json().errors;",
+                  "  pm.expect(e).to.have.all.keys('customer.firstName', 'customer.email', 'quantity', 'card.holderName', 'card.number', 'card.expiry', 'card.cvv');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Consulta de órdenes",
+      "item": [
+        {
+          "name": "Consultar con número de orden y correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/lookup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "lookup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{paidOrderId}}\",\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 con estado y bitácora', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const o = pm.response.json();",
+                  "  pm.expect(o.events.map(e => e.eventType)).to.include('order.paid');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar con otro correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/lookup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "lookup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{paidOrderId}}\",\n  \"email\": \"otra@correo.mx\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404: no revela que la orden existe', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle por id (uso interno)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{paidOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{paidOrderId}}"
+              ]
+            },
+            "description": "Solo para clientes internos con API key; no está expuesto en la web."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Clientes",
+      "item": [
+        {
+          "name": "Registrar cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Luis\",\n  \"lastName\": \"P\\u00e9rez\",\n  \"email\": \"cliente.{{$timestamp}}@correo.mx\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 con Location', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.headers.get('Location')).to.include('/api/v1/customers/');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar un correo existente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "customers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"L\\u00f3pez\",\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 cliente duplicado', () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().code).to.eql('customer_exists');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Seguridad y salud",
+      "item": [
+        {
+          "name": "Sin API key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 en español', () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().title).to.eql('No autenticado.');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cabeceras de seguridad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CSP, nosniff y sin caché', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Security-Policy')).to.include(\"default-src 'none'\");",
+                  "  pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff');",
+                  "  pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store');",
+                  "  pm.expect(pm.response.headers.get('X-Correlation-Id')).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salud (sin API key)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Healthy', () => pm.expect(pm.response.text()).to.eql('Healthy'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
