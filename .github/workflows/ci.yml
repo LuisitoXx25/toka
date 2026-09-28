@@ -31,7 +31,7 @@ jobs:
       - run: dotnet build --no-restore -c Release
       # Integration tests start PostgreSQL with Testcontainers; the runner provides Docker.
       - run: dotnet test --no-build -c Release --logger trx --results-directory TestResults --collect:"XPlat Code Coverage"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-test-results
