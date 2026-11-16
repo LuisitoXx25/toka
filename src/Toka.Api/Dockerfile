@@ -1,6 +1,6 @@
 # Build context: repository root (needs Toka.sln and Directory.Build.props).
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 # Project files first so the restore layer is cached until dependencies change.
 COPY Directory.Build.props Toka.sln ./
